@@ -1,26 +1,26 @@
 TARGET = pingpong-scheduler
 LIBS =
 CC = gcc
-CFLAGS = -Wall
+FLAGS = -Wall
+CQUEUE = 	queue.c
+QUEUE = queue
+CPING = pingpong.c
 
-.PHONY: default all clean
 
-default: $(TARGET)
-all: default
-debug: default
+all: $(TARGET)
+	@echo "Concluido"
 
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
+$(TARGET): scheduler pingpong queue
+	$(CC) $(FLAGS) -o $(TARGET) scheduler pingpong queue
 
-debug: DEBUG = -DDEBUG
+scheduler: pingpong-scheduler.c
+	$(CC) -c pingpong-scheduler.c -o scheduler
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(DEBUG) -c $< -o $@
+pingpong: pingpong.c
+	$(CC) -c pingpong.c -o pingpong
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
-
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) $(CFLAGS) $(LIBS) -o $@
+queue: queue.c
+	$(CC) -c queue.c -o queue
 
 clean:
 	-rm -f *.o
