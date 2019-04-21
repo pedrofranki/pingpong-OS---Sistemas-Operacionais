@@ -1,166 +1,149 @@
-// =====================================
-// queue.c
-// Autor: Victor Barpp Gomes
-// Data de início: 17/08/2017
-// Data de término: 17/08/2017
-// Disciplina: Sistemas Operacionais
-// =====================================
-
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 #include "queue.h"
 
-void queue_append(queue_t** queue, queue_t* elem) {
-    // Se a fila não existe, aborta.
-    if (queue == NULL) {
-#ifdef DEBUG
-        printf("Erro queue_append: A fila nao existe.\n");
-#endif
+
+//------------------------------------------------------------------------------
+// Insere um elemento no final da fila.
+// Condicoes a verificar, gerando msgs de erro:
+// - a fila deve existir
+// - o elemento deve existir
+// - o elemento nao deve estar em outra fila
+
+void queue_append (queue_t **queue, queue_t *elem) {
+    queue_t* aux;
+
+    if(queue == NULL){
+        printf("ERRO: A fila nao existe\n");
         return;
     }
 
-    // Se o elemento não existe, aborta.
-    if (elem == NULL) {
-#ifdef DEBUG
-        printf("Erro queue_append: O elemento nao existe.\n");
-#endif
+    if(elem == NULL){
+        printf("ERRO: O elemento nao existe\n");
         return;
     }
 
-    // Se o elemento já está em uma fila, aborta.
-    if (elem->next != NULL || elem->prev != NULL) {
-#ifdef DEBUG
-        printf("Erro queue_append: O elemento ja esta em uma fila.\n");
-#endif
+    if(elem->next!=NULL || elem->prev!=NULL){
+        printf("ERRO: o elemento pertence a outra fila\n");
         return;
     }
 
-    // Se a fila está vazia, faz ela apontar para o elemento.
-    // Também ajusta os elementos próximo e anterior.
-    if (*queue == NULL) {
-        *queue = elem;
+
+    if((*queue) == NULL){
+        (*queue) = elem;
         elem->next = elem;
         elem->prev = elem;
         return;
     }
 
-    // Se a fila não está vazia, adiciona o elemento no final da fila.
-    // Isso é feito acessando o elemento anterior ao primeiro (que é o último, porque a fila é circular).
-    elem->prev = (*queue)->prev; // O anterior ao novo elemento é o antigo último elemento.
-    elem->next = (*queue);       // O próximo ao novo elemento é o primeiro elemento.
-    (*queue)->prev->next = elem; // O próximo ao antigo último elemento é o novo elemento.
-    (*queue)->prev = elem;       // O anterior ao primeiro elemento é o novo elemento.
 
+    //int i=0;
+    elem->prev = (*queue)->prev;
+    elem->next = (*queue);
+    (*queue)->prev->next = elem;
+    (*queue)->prev = elem;
     return;
+    //printf("a %d -b %d \n", queue, elem);
 }
 
-queue_t* queue_remove(queue_t** queue, queue_t* elem) {
-    // Se a fila não existe, aborta.
-    if (queue == NULL) {
-#ifdef DEBUG
-        printf("Erro queue_remove: A fila nao existe.\n");
-#endif
+//------------------------------------------------------------------------------
+// Remove o elemento indicado da fila, sem o destruir.
+// Condicoes a verificar, gerando msgs de erro:
+// - a fila deve existir
+// - a fila nao deve estar vazia
+// - o elemento deve existir
+// - o elemento deve pertencer a fila indicada
+// Retorno: apontador para o elemento removido, ou NULL se erro
+
+queue_t *queue_remove (queue_t **queue, queue_t *elem) {
+    queue_t* aux;
+    if(queue == NULL) {
+        printf("ERRO: A fila nao existe\n");
+        return NULL;
+    }
+    if((*queue) == NULL){
+        printf("ERRO: A fila esta vazia\n");
+        return NULL;
+    }
+    if(elem == NULL){
+        printf("O elemento nao existe\n");
         return NULL;
     }
 
-    // Se o elemento não existe, aborta.
-    if (elem == NULL) {
-#ifdef DEBUG
-        printf("Erro queue_remove: O elemento nao existe.\n");
-#endif
+    aux = (*queue);
+    while(aux != elem){
+      aux=aux->next;
+      if(aux == (*queue)){
         return NULL;
+      }
     }
 
-    queue_t* iterator = (*queue);
+    if(aux->next == aux && aux->prev == aux){
+      aux->prev = NULL;
+      aux->next = NULL;
+      (*queue)=NULL;
+      return elem;
+    }//verifica se a fila tem um elemento
 
-    queue_t* nextElem;
-    queue_t* prevElem;
 
-    // Se a fila é vazia, retorna NULL.
-    if (*queue == NULL) {
-#ifdef DEBUG
-        printf("Erro queue_remove: A fila esta vazia.\n");
-#endif
-        return NULL;
-    }
+    if((*queue)==elem)
+      (*queue) = elem->next;
 
-    // Verifica se o elemento realmente está na fila fornecida.
-    while (iterator != elem) {
-        iterator = iterator->next;
+    queue_t* ant = elem->prev;
+    queue_t* prox = elem->next;
 
-        // Caso tenha chegado ao início da fila novamente, não remove o elemento.
-        if (iterator == (*queue)) {
-#ifdef DEBUG
-            printf("Erro queue_remove: O elemento nao pertence a fila indicada.\n");
-#endif
-            return NULL;
-        }
-    }
+    ant->next = prox;
+    prox->prev = ant;
+    *queue = prox;
+    aux->next = NULL;
+    aux->prev = NULL;
 
-    // Se a fila tem só um elemento, deixa a fila vazia.
-    // Também ajusta os elementos próximo e anterior.
-    if (elem->next == elem && elem->prev == elem) {
-        elem->next = NULL;
-        elem->prev = NULL;
-        (*queue) = NULL;
-
-        return elem;
-    }
-
-    // Se a fila tem mais de um elemento, retira o elemento e "gruda" os pedaços.
-    // Se o elemento for o primeiro, reajusta o ponteiro da fila para o segundo.
-    if ((*queue) == elem) {
-        (*queue) = elem->next;
-    }
-    nextElem = elem->next;
-    prevElem = elem->prev;
-
-    nextElem->prev = prevElem;
-    prevElem->next = nextElem;
-
-    elem->next = NULL;
-    elem->prev = NULL;
-
-    return elem;
+    return aux;
 }
 
-int queue_size(queue_t* queue) {
-    int i = 0;
-    queue_t* iterator;
+//------------------------------------------------------------------------------
+// Conta o numero de elementos na fila
+// Retorno: numero de elementos na fila
 
-    // Se a fila é nula, então tem zero elementos.
-    if (queue == NULL) {
+int queue_size (queue_t *queue){
+    queue_t* aux;
+    if(queue == NULL)
         return 0;
+
+    aux = queue;
+    if(aux->next == aux && aux->prev == aux)
+        return 1;
+    int i=1;
+    while(aux->next != queue){
+        aux = aux->next;
+        i++;
     }
-
-    iterator = queue->next;
-
-    for (i = 1; iterator != queue; iterator = iterator->next, i++);
-
     return i;
 }
 
-void queue_print(char* name, queue_t* queue, void print_elem(void*)) {
-    queue_t* iterator = queue;
+//------------------------------------------------------------------------------
+// Percorre a fila e imprime na tela seu conteÃºdo. A impressÃ£o de cada
+// elemento Ã© feita por uma funÃ§Ã£o externa, definida pelo programa que
+// usa a biblioteca. Essa funÃ§Ã£o deve ter o seguinte protÃ³tipo:
+//
+// void print_elem (void *ptr) ; // ptr aponta para o elemento a imprimir
 
-    printf("%s", name);
-    printf("[");
-
-    // Se a fila é nula, então aborta.
-    if (queue == NULL) {
-        printf("]\n");
-        return;
-    }
-
-    // Caso externo (só para não printar o primeiro espaço a esquerda)
-    print_elem(iterator);
-    iterator = iterator->next;
-
-    while (iterator != queue) {
-        printf(" ");
-        print_elem(iterator);
-        iterator = iterator->next;
-    }
-
+void queue_print (char *name, queue_t *queue, void print_elem (void*) ) {
+  queue_t *aux = queue;
+  printf("%s [", name);
+  if(queue == NULL){
     printf("]\n");
     return;
+  }else{
+    while(aux != queue){
+      print_elem(aux);
+      printf(" ");
+      aux = aux->next;
+    }
+  }
+  printf("]\n");
+  return;
+
+
 }
