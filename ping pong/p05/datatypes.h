@@ -13,7 +13,6 @@ typedef struct task_t{
   struct task_t *prev, *next;
   int tid;
   ucontext_t context;
-  char state;
   struct task_t** queue;
   int prioEst;
   int prioDin;

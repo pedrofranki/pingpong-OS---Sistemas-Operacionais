@@ -9,16 +9,19 @@
 #define MINPRIO -20
 #define MAXPRIO 20
 #define TASKAGING -1
+#define TICKS 20
 
 void dispatcher_body ();
 task_t *scheduler();
+void tick_count();
 
-long int id=0, userTasks=0;
+long int id = 0, userTasks=0;
 task_t mainTask, *execTask, *ant, *taskQueue;
 task_t dispatcher;
-
-
-
+short int ticks;
+int idDispacher;
+struct sigaction action;
+struct itimerval timer;
 
 void pingpong_init (){
     setvbuf (stdout, 0, _IONBF, 0) ;
@@ -28,8 +31,28 @@ void pingpong_init (){
     mainTask.tid = id++;
 
     execTask = &mainTask;
-    task_create(&dispatcher, dispatcher_body, NULL);
+    idDispacher = task_create(&dispatcher, dispatcher_body, NULL);
 
+    action.sa_handler = tick_count ;
+    sigemptyset (&action.sa_mask) ;
+    action.sa_flags = 0 ;
+    if (sigaction (SIGALRM, &action, 0) < 0)
+    {
+      perror ("Erro em sigaction: ") ;
+      exit (1) ;
+    }else
+      printf("aaa\n");
+
+    timer.it_value.tv_usec = 800 ;      // primeiro disparo, em micro-segundos
+    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
+    timer.it_interval.tv_usec = 800 ;   // disparos subsequentes, em micro-segundos
+    timer.it_interval.tv_sec  = 0 ;
+
+    if (setitimer (ITIMER_REAL, &timer, 0) < 0)
+    {
+      perror ("Erro em setitimer: ") ;
+      exit (1) ;
+    }
 }
 
 
@@ -59,11 +82,9 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     id++;
 
     if(task->tid >1){
-      //printf("aaa\n");
       queue_append((queue_t**)&taskQueue, (queue_t*)task);
       userTasks++;
       task->queue = &taskQueue;
-      task->state = 'e';
     }
 
     task->tid = id;
@@ -109,7 +130,6 @@ void task_suspend (task_t *task, task_t **queue) {
   queue_remove((queue_t**)task->queue, (queue_t*)task);
 
   queue_append((queue_t**)queue, (queue_t*)task);
-  task->state = 's';
   userTasks--;
   task->queue = queue;
 }
@@ -118,14 +138,14 @@ void task_resume (task_t *task) {
   queue_remove((queue_t**)task->queue, (queue_t*)task);
   queue_append((queue_t**)&execTask, (queue_t*)task);
   task->queue = &execTask;
-  task->state = 'p';
+
 }
 
 void task_yield () {
   if(execTask->tid != 0){
     queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
     execTask->queue = &taskQueue;
-    execTask->state = 'e';
+
     userTasks++;
   }
   task_switch(&dispatcher);
@@ -136,9 +156,8 @@ task_t *scheduler(){
   int prioMin = MAXPRIO + 1;
 
   aux = taskQueue;
-//  printf("%d\n",queue_size(taskQueue));
   do{
-    //printf("carlos\n");
+
     if(aux->prioDin < prioMin){
         next = aux;
         prioMin = aux->prioDin;
@@ -153,25 +172,19 @@ task_t *scheduler(){
     aux = aux->next;
 
   }while(aux != taskQueue);
-//printf("awdlos\n");
   next->prioDin = next->prioEst;
   next->prioDin += TASKAGING;
 
   aux = taskQueue;
   int i=0;
   do{
-    //printf("%d\n", i++);
     if(aux->prioDin>MINPRIO && aux->prioDin < MAXPRIO)
       aux->prioDin += TASKAGING;
 
     aux = aux->next;
-    //printf("aaaa\n");
   }while(aux != taskQueue);
-  //printf("www\n");
   userTasks--;
-  //printf("qqqqqaa\n");
   task_t* prox=(task_t*) queue_remove((queue_t**)next->queue, (queue_t*)next);
-  //printf("adawd\n");
   return prox;
 }
 
@@ -180,9 +193,7 @@ void dispatcher_body () // dispatcher é uma tarefa
    task_t *next;
    int i=0;
    while ( userTasks > 0 ){
-      //printf("\t\t%d\n", i++);
       next = scheduler();
-      //printf("adawd\n");
       next->queue = NULL;
       if (next){
          task_switch (next) ; // transfere controle para a tarefa "next"
@@ -198,10 +209,8 @@ void task_setprio (task_t *task, int prio){
     if(prio>=MINPRIO && prio<=MAXPRIO){
         task->prioDin = prio;
         task->prioEst = prio;
-
     }
   }
-  //printf("%d\n", prio);
 }
 
 int task_getprio (task_t *task) {
@@ -209,4 +218,16 @@ int task_getprio (task_t *task) {
     task = execTask;
 
   return task->prioEst;
+}
+
+void tick_count(){
+  //printf("%d\n", ticks);
+  if(task_id() != idDispacher){
+    ticks--;
+    //printf("%d\n", ticks);
+    if(ticks <= 0){
+      ticks = 20;
+      task_yield();
+    }
+  }
 }

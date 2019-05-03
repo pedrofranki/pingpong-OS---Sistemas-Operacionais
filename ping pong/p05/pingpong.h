@@ -11,6 +11,9 @@
 
 #include "datatypes.h"		// estruturas de dados necessárias
 #include <ucontext.h>
+#include <signal.h>
+#include <sys/time.h>
+
 // funções gerais ==============================================================
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
