@@ -10,6 +10,8 @@
 #define MAXPRIO 20
 #define TASKAGING -1
 #define TICKS 20
+#define TIMEMICRO 1000
+
 
 void dispatcher_body ();
 task_t *scheduler();
@@ -18,7 +20,7 @@ void tick_count();
 long int id = 0, userTasks=0;
 task_t mainTask, *execTask, *ant, *taskQueue;
 task_t dispatcher;
-short int ticks;
+int ticks = 0;
 int idDispacher;
 struct sigaction action;
 struct itimerval timer;
@@ -40,12 +42,11 @@ void pingpong_init (){
     {
       perror ("Erro em sigaction: ") ;
       exit (1) ;
-    }else
-      printf("aaa\n");
+    }
 
-    timer.it_value.tv_usec = 1000 ;      // primeiro disparo, em micro-segundos
+    timer.it_value.tv_usec = TIMEMICRO;      // primeiro disparo, em micro-segundos
     timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
-    timer.it_interval.tv_usec = 1000 ;   // disparos subsequentes, em micro-segundos
+    timer.it_interval.tv_usec = TIMEMICRO ;   // disparos subsequentes, em micro-segundos
     timer.it_interval.tv_sec  = 0 ;
 
     if (setitimer (ITIMER_REAL, &timer, 0) < 0)
@@ -87,8 +88,9 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
       task->queue = &taskQueue;
     }
 
-    task->tid = id;
-    id++;
+    task->tid = id++;
+    task->creationTime = systime();
+    task->activations=0;
 #ifdef DEBUG
     printf("task_create: task %d criada.\n", task->tid);
 #endif
@@ -98,6 +100,9 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
 
 
 void task_exit (int exitCode){
+    execTask->exitTime = systime();
+    printf("Task %d exit: execution time %d ms, processor time %d ms, %d activations", execTask->tid,
+    execTask->exitTime - execTask->creationTime, execTask->processorTime, execTask->activations);
     #ifdef DEBUG
         printf("task_exit: encerrando task %d.\n", taskExec->tid);
     #endif
@@ -113,10 +118,13 @@ int task_switch (task_t *task){
     ant = execTask;
     execTask = task;
 
+    task->activations++;
     if(swapcontext(&(ant->context), &(task->context))<0){
         execTask = ant;
         return -1;
     }
+
+
     return 0;
 }
 
@@ -188,7 +196,6 @@ task_t *scheduler(){
   task_t* prox=(task_t*) queue_remove((queue_t**)next->queue, (queue_t*)next);
   return prox;*/
   userTasks--;
-
   return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);
 }
 
@@ -199,7 +206,7 @@ void dispatcher_body () // dispatcher é uma tarefa
    while ( userTasks > 0 ){
       next = scheduler();
       next->queue = NULL;
-      next->quantum = 20;
+      next->quantum = TICKS;
       if (next){
          task_switch (next) ; // transfere controle para a tarefa "next"
       }
@@ -226,10 +233,17 @@ int task_getprio (task_t *task) {
 }
 
 void tick_count(){
+  ticks++;
+
   if(task_id() != idDispacher){
     execTask->quantum--;
+    execTask->processorTime++;
     if(execTask->quantum <= 0){
       task_yield();
     }
   }
+}
+
+unsigned int systime (){
+  return ticks;
 }
