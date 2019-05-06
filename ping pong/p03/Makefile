@@ -1,26 +1,26 @@
 TARGET = pingpong-dispatcher
-LIBS = 
+LIBS =
 CC = gcc
-CFLAGS = -Wall
+FLAGS = -Wall
+CQUEUE = 	queue.c
+QUEUE = queue
+CPING = pingpong.c
 
-.PHONY: default all clean
 
-default: $(TARGET)
-all: default
-debug: default
+all: $(TARGET)
+	@echo "Concluido"
 
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
+$(TARGET): dispatcher pingpong queue
+	$(CC) $(FLAGS) -o $(TARGET) dispatcher pingpong queue $(FLAGS)
 
-debug: DEBUG = -DDEBUG
+dispatcher: pingpong-dispatcher.c
+	$(CC) -c pingpong-dispatcher.c -o dispatcher $(FLAGS) 
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(DEBUG) -c $< -o $@
+pingpong: pingpong.c
+	$(CC) -c pingpong.c -o pingpong $(FLAGS)
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
-
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) $(CFLAGS) $(LIBS) -o $@
+queue: queue.c
+	$(CC) -c queue.c -o queue $(FLAGS)
 
 clean:
 	-rm -f *.o

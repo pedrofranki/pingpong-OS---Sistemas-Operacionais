@@ -1,16 +1,15 @@
-// PingPongOS - PingPong Operating System
-// Prof. Carlos A. Maziero, DAINF UTFPR
-// Versão 1.0 -- Março de 2015
-//
-// Estruturas de dados internas do sistema operacional
+//Pedro Henrique Belotto Frankiewicz
+//RA 1189212
 
 #ifndef __DATATYPES__
 #define __DATATYPES__
-
+#include <ucontext.h>
 // Estrutura que define uma tarefa
 typedef struct task_t
 {
-  // preencher quando necessário
+  struct task_t *prev, *next;
+  int tid;
+  struct ucontext_t context;
 } task_t ;
 
 // estrutura que define um semáforo

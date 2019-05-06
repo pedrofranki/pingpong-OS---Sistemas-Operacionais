@@ -1,3 +1,6 @@
+//Pedro Henrique Belotto Frankiewicz
+//RA 1189212
+
 #include "datatypes.h"
 #include "queue.h"
 #include "pingpong.h"
@@ -117,14 +120,14 @@ void task_exit (int exitCode){
 int task_switch (task_t *task){
     ant = execTask;
     execTask = task;
-
+    #ifdef DEBUG
+      printf("task_switch: trocando contexto %d -> %d\n", ant->tid, taskExec->tid);
+    #endif
     task->activations++;
     if(swapcontext(&(ant->context), &(task->context))<0){
         execTask = ant;
         return -1;
     }
-
-
     return 0;
 }
 
@@ -134,19 +137,26 @@ int task_id (){
 }
 
 void task_suspend (task_t *task, task_t **queue) {
-
-  queue_remove((queue_t**)task->queue, (queue_t*)task);
-
-  queue_append((queue_t**)queue, (queue_t*)task);
-  userTasks--;
-  task->queue = queue;
+  if(queue != NULL){
+    if(task == NULL){
+      queue_remove((queue_t**)execTask->queue, (queue_t*)execTask);
+      queue_append((queue_t**)queue, (queue_t*)execTask);
+      execTask->state = 's';
+    }else{
+      queue_remove((queue_t**)task->queue, (queue_t*)task);
+      queue_append((queue_t**)queue, (queue_t*)task);
+      execTask->state = 's';
+      userTasks--;
+      task->queue = queue;
+    }
+  }
 }
 
 void task_resume (task_t *task) {
   queue_remove((queue_t**)task->queue, (queue_t*)task);
-  queue_append((queue_t**)&execTask, (queue_t*)task);
-  task->queue = &execTask;
-
+  queue_append((queue_t**)&taskQueue, (queue_t*)task);
+  task->queue = &taskQueue;
+  task->state = 'r';
 }
 
 void task_yield () {
@@ -160,47 +170,11 @@ void task_yield () {
 }
 
 task_t *scheduler(){
-  /*
-  task_t *aux, *next;
-  int prioMin = MAXPRIO + 1;
-
-  aux = taskQueue;
-  do{
-
-    if(aux->prioDin < prioMin){
-        next = aux;
-        prioMin = aux->prioDin;
-    }else if(aux->prioDin == prioMin){
-        if(aux->prioEst < next->prioEst){
-          next = aux;
-        }
-        next = aux;
-        prioMin = aux->prioDin;
-    }
-
-    aux = aux->next;
-
-  }while(aux != taskQueue);
-  next->prioDin = next->prioEst;
-  next->prioDin += TASKAGING;
-
-  aux = taskQueue;
-  int i=0;
-  do{
-    if(aux->prioDin>MINPRIO && aux->prioDin < MAXPRIO)
-      aux->prioDin += TASKAGING;
-
-    aux = aux->next;
-  }while(aux != taskQueue);
-  userTasks--;
-  task_t* prox=(task_t*) queue_remove((queue_t**)next->queue, (queue_t*)next);
-  return prox;*/
   userTasks--;
   return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);
 }
 
-void dispatcher_body () // dispatcher é uma tarefa
-{
+void dispatcher_body () {
    task_t *next;
    int i=0;
    while ( userTasks > 0 ){
@@ -208,10 +182,10 @@ void dispatcher_body () // dispatcher é uma tarefa
       next->queue = NULL;
       next->quantum = TICKS;
       if (next){
-         task_switch (next) ; // transfere controle para a tarefa "next"
+         task_switch (next) ;
       }
    }
-   task_exit(0) ; // encerra a tarefa dispatcher
+   task_exit(0) ;
 }
 
 void task_setprio (task_t *task, int prio){
@@ -234,7 +208,6 @@ int task_getprio (task_t *task) {
 
 void tick_count(){
   ticks++;
-
   if(task_id() != idDispacher){
     execTask->quantum--;
     execTask->processorTime++;

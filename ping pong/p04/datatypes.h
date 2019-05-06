@@ -1,8 +1,5 @@
-// PingPongOS - PingPong Operating System
-// Prof. Carlos A. Maziero, DAINF UTFPR
-// Versão 1.0 -- Março de 2015
-//
-// Estruturas de dados internas do sistema operacional
+//Pedro Henrique Belotto Frankiewicz
+//RA 1189212
 
 #ifndef __DATATYPES__
 #define __DATATYPES__
@@ -13,8 +10,8 @@ typedef struct task_t{
   struct task_t *prev, *next;
   int tid;
   ucontext_t context;
-  char state;
   struct task_t** queue;
+  char state;
   int prioEst;
   int prioDin;
 } task_t ;

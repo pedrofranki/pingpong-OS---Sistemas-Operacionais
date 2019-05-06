@@ -112,7 +112,9 @@ void task_exit (int exitCode){
 int task_switch (task_t *task){
     ant = execTask;
     execTask = task;
-
+    #ifdef DEBUG
+      printf("task_switch: trocando contexto %d -> %d\n", ant->tid, exec->tid);
+    #endif
     if(swapcontext(&(ant->context), &(task->context))<0){
         execTask = ant;
         return -1;
@@ -145,48 +147,14 @@ void task_yield () {
   if(execTask->tid != 0){
     queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
     execTask->queue = &taskQueue;
-
+    
     userTasks++;
   }
   task_switch(&dispatcher);
 }
 
 task_t *scheduler(){
-  /*
-  task_t *aux, *next;
-  int prioMin = MAXPRIO + 1;
 
-  aux = taskQueue;
-  do{
-
-    if(aux->prioDin < prioMin){
-        next = aux;
-        prioMin = aux->prioDin;
-    }else if(aux->prioDin == prioMin){
-        if(aux->prioEst < next->prioEst){
-          next = aux;
-        }
-        next = aux;
-        prioMin = aux->prioDin;
-    }
-
-    aux = aux->next;
-
-  }while(aux != taskQueue);
-  next->prioDin = next->prioEst;
-  next->prioDin += TASKAGING;
-
-  aux = taskQueue;
-  int i=0;
-  do{
-    if(aux->prioDin>MINPRIO && aux->prioDin < MAXPRIO)
-      aux->prioDin += TASKAGING;
-
-    aux = aux->next;
-  }while(aux != taskQueue);
-  userTasks--;
-  task_t* prox=(task_t*) queue_remove((queue_t**)next->queue, (queue_t*)next);
-  return prox;*/
   userTasks--;
 
   return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);

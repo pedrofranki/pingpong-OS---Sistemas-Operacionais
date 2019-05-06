@@ -1,3 +1,7 @@
+//Pedro Henrique Belotto Frankiewicz
+//RA 1189212
+
+
 #include "datatypes.h"
 #include "queue.h"
 #include "pingpong.h"
@@ -15,13 +19,9 @@ task_t mainTask, *execTask, *ant, *taskQueue;
 task_t dispatcher;
 
 
-
-
 void pingpong_init (){
     setvbuf (stdout, 0, _IONBF, 0) ;
 
-    mainTask.next = NULL;
-    mainTask.prev = NULL;
     mainTask.tid = id++;
 
     execTask = &mainTask;
@@ -56,11 +56,9 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     id++;
 
     if(task->tid >1){
-      //printf("aaa\n");
       queue_append((queue_t**)&taskQueue, (queue_t*)task);
       userTasks++;
       task->queue = &taskQueue;
-      task->state = 'e';
     }
 
     task->tid = id;
@@ -88,7 +86,9 @@ void task_exit (int exitCode){
 int task_switch (task_t *task){
     ant = execTask;
     execTask = task;
-
+    #ifdef DEBUG
+      printf("task_switch: trocando contexto %d -> %d\n", ant->tid, taskExec->tid);
+    #endif
     if(swapcontext(&(ant->context), &(task->context))<0){
         execTask = ant;
         return -1;
@@ -102,28 +102,32 @@ int task_id (){
 }
 
 void task_suspend (task_t *task, task_t **queue) {
-
-  queue_remove((queue_t**)task->queue, (queue_t*)task);
-
-  queue_append((queue_t**)queue, (queue_t*)task);
-  task->state = 's';
-  userTasks--;
-  task->queue = queue;
+  if(queue != NULL){
+    if(task == NULL){
+      queue_remove((queue_t**)execTask->queue, (queue_t*)execTask);
+      queue_append((queue_t**)queue, (queue_t*)execTask);
+      execTask->state = 's';
+    }else{
+      queue_remove((queue_t**)task->queue, (queue_t*)task);
+      queue_append((queue_t**)queue, (queue_t*)task);
+      execTask->state = 's';
+      userTasks--;
+      task->queue = queue;
+    }
+  }
 }
 
 void task_resume (task_t *task) {
   queue_remove((queue_t**)task->queue, (queue_t*)task);
-  queue_append((queue_t**)&execTask, (queue_t*)task);
-  task->queue = &execTask;
-  task->state = 'p';
+  queue_append((queue_t**)&taskQueue, (queue_t*)task);
+  task->queue = &taskQueue;
+  task->state = 'r';
 }
 
 void task_yield () {
   if(execTask->tid != 0){
-    //printf("b\n");
     queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
     execTask->queue = &taskQueue;
-    execTask->state = 'e';
     userTasks++;
   }
   task_switch(&dispatcher);
@@ -134,18 +138,15 @@ task_t *scheduler(){
   return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);
 }
 
-void dispatcher_body () // dispatcher é uma tarefa
-{
+void dispatcher_body (){
    task_t *next;
 
    while ( userTasks > 0 ){
-      //printf("%ld\n", userTasks);
       next = scheduler();
       next->queue = NULL;
       if (next){
          task_switch (next) ; // transfere controle para a tarefa "next"
       }
    }
-   printf("carlos\n");
    task_exit(0) ; // encerra a tarefa dispatcher
 }
