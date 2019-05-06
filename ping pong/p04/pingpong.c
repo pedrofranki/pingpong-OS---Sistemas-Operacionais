@@ -125,7 +125,7 @@ void task_resume (task_t *task) {
   queue_remove((queue_t**)task->queue, (queue_t*)task);
   queue_append((queue_t**)&taskQueue, (queue_t*)task);
   task->queue = &taskQueue;
-  task->state = 'r'
+  task->state = 'r';
 }
 
 void task_yield () {

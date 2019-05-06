@@ -30,13 +30,14 @@ struct sigaction action;
 struct itimerval timer;
 
 void pingpong_init (){
+    //Desativa buffer de saida
     setvbuf (stdout, 0, _IONBF, 0) ;
 
     mainTask.tid = id++;
-
+    //salva o contexto da main
     execTask = &mainTask;
     idDispacher = task_create(&dispatcher, dispatcher_body, NULL);
-
+    //altera a o alarme de tempo para responder a função
     action.sa_handler = tick_count ;
     sigemptyset (&action.sa_mask) ;
     action.sa_flags = 0 ;
@@ -45,7 +46,7 @@ void pingpong_init (){
       perror ("Erro em sigaction: ") ;
       exit (1) ;
     }
-
+    //seta o timer
     timer.it_value.tv_usec = TIMEMICRO;      // primeiro disparo, em micro-segundos
     timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
     timer.it_interval.tv_usec = TIMEMICRO ;   // disparos subsequentes, em micro-segundos
@@ -62,9 +63,9 @@ void pingpong_init (){
 int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     char* stack;
     task->tid = id++;
-
+    //Pega o contexto da tarefa que foi passada
     getcontext(&(task->context));
-
+    //aloca a memoria para o contexto
     stack = malloc(STACKSIZE);
     if (stack)
    {
@@ -78,11 +79,11 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
       perror ("Erro na criação da pilha: ");
       exit (1);
    }
+    //cria o contexto
     makecontext(&(task->context), (void *)(*start_func), 1, arg);
 
     task->tid = id;
     id++;
-    printf("%d\n", id);
     if(task->tid >1){
       queue_append((queue_t**)&taskQueue, (queue_t*)task);
       userTasks++;
@@ -170,7 +171,7 @@ void task_yield () {
 task_t *scheduler(){
   task_t *aux, *next;
   int prioMin = MAXPRIO + 1;
-
+  
   aux = taskQueue;
   do{
 
