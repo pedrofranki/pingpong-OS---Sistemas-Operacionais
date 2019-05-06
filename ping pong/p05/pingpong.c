@@ -29,8 +29,7 @@ struct itimerval timer;
 void pingpong_init (){
     setvbuf (stdout, 0, _IONBF, 0) ;
 
-    mainTask.next = NULL;
-    mainTask.prev = NULL;
+
     mainTask.tid = id++;
 
     execTask = &mainTask;
@@ -61,8 +60,7 @@ void pingpong_init (){
 int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     char* stack;
     task->tid = id++;
-    task->next = NULL;
-    task->prev = NULL;
+    
     getcontext(&(task->context));
 
     stack = malloc(STACKSIZE);
