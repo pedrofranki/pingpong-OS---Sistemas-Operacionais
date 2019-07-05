@@ -11,6 +11,7 @@ typedef struct task_t{
   int tid;
   ucontext_t context;
   struct task_t** queue;
+  char state;
   int quantum;
   int prioEst;
   int prioDin;

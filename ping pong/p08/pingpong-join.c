@@ -16,7 +16,9 @@ void Body (void * arg)
    int i,j,max ;
 
    max = Limite ;
+   //printf("\t%d - %d\n", max, Limite);
    Limite += 2 ;
+   //printf("\t%d - %d\n", max, Limite);
 
    for (i=0; i<max; i++)
    {

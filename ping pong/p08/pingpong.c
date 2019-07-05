@@ -1,7 +1,6 @@
 //Pedro Henrique Belotto Frankiewicz
 //RA 1189212
 
-
 #include "datatypes.h"
 #include "queue.h"
 #include "pingpong.h"
@@ -20,9 +19,9 @@
 void dispatcher_body ();
 task_t *scheduler();
 void tick_count();
-
-int id = 0, userTasks=0;
-task_t mainTask, *execTask, *ant, *taskQueue;
+int i=0;
+long int id = 0, userTasks=0;
+task_t mainTask, *execTask, *ant, *taskQueue, *suspendQueue;
 task_t dispatcher;
 int ticks = 0;
 int idDispacher;
@@ -30,14 +29,15 @@ struct sigaction action;
 struct itimerval timer;
 
 void pingpong_init (){
-    //Desativa buffer de saida
     setvbuf (stdout, 0, _IONBF, 0) ;
 
+
     mainTask.tid = id++;
-    //salva o contexto da main
+
     execTask = &mainTask;
+    //printf("%d\n", execTask->tid);
     idDispacher = task_create(&dispatcher, dispatcher_body, NULL);
-    //altera a o alarme de tempo para responder a função
+
     action.sa_handler = tick_count ;
     sigemptyset (&action.sa_mask) ;
     action.sa_flags = 0 ;
@@ -46,7 +46,7 @@ void pingpong_init (){
       perror ("Erro em sigaction: ") ;
       exit (1) ;
     }
-    //seta o timer
+
     timer.it_value.tv_usec = TIMEMICRO;      // primeiro disparo, em micro-segundos
     timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
     timer.it_interval.tv_usec = TIMEMICRO ;   // disparos subsequentes, em micro-segundos
@@ -57,15 +57,17 @@ void pingpong_init (){
       perror ("Erro em setitimer: ") ;
       exit (1) ;
     }
+
+    task_yield();
 }
 
 
 int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     char* stack;
     //task->tid = id++;
-    //Pega o contexto da tarefa que foi passada
+
     getcontext(&(task->context));
-    //aloca a memoria para o contexto
+
     stack = malloc(STACKSIZE);
     if (stack)
    {
@@ -79,11 +81,11 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
       perror ("Erro na criação da pilha: ");
       exit (1);
    }
-    //cria o contexto
     makecontext(&(task->context), (void *)(*start_func), 1, arg);
 
     task->tid = id;
     id++;
+    //printf("%d", task->tid);
     if(task->tid >1){
       queue_append((queue_t**)&taskQueue, (queue_t*)task);
       userTasks++;
@@ -102,17 +104,29 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
 
 
 void task_exit (int exitCode){
+  
     execTask->exitTime = systime();
     printf("Task %d exit: execution time %d ms, processor time %d ms, %d activations\n", execTask->tid,
     execTask->exitTime - execTask->creationTime, execTask->processorTime, execTask->activations);
+    
     #ifdef DEBUG
         printf("task_exit: encerrando task %d.\n", taskExec->tid);
     #endif
+    if(queue_size((queue_t*)execTask->susQueue)>0){
+        task_resume(execTask->susQueue);
+    }
+    execTask->state = 'f';
+    execTask->exitCode = exitCode;
 
-    if(execTask == &dispatcher)
+ 
+
+    if(execTask == &dispatcher){
       task_switch(&mainTask);
-    else
+    }else{
+      dispatcher.activations++;
       task_switch(&dispatcher);
+    }
+      
 }
 
 
@@ -123,7 +137,9 @@ int task_switch (task_t *task){
       printf("task_switch: trocando contexto %d -> %d\n", ant->tid, taskExec->tid);
     #endif
     task->activations++;
+    
     if(swapcontext(&(ant->context), &(task->context))<0){
+        
         execTask = ant;
         return -1;
     }
@@ -137,15 +153,19 @@ int task_id (){
 
 void task_suspend (task_t *task, task_t **queue) {
   if(queue != NULL){
-    if(task == NULL){
+    if(task == NULL ){
+   
       queue_remove((queue_t**)execTask->queue, (queue_t*)execTask);
+   
       queue_append((queue_t**)queue, (queue_t*)execTask);
+      execTask->queue= queue;
       execTask->state = 's';
-    }else{
-      queue_remove((queue_t**)task->queue, (queue_t*)task);
+    }else if(task->state == 'r'){
+
+      queue_remove((queue_t**)&taskQueue, (queue_t*)task);
       queue_append((queue_t**)queue, (queue_t*)task);
       execTask->state = 's';
-      userTasks--;
+
       task->queue = queue;
     }
   }
@@ -154,21 +174,35 @@ void task_suspend (task_t *task, task_t **queue) {
 void task_resume (task_t *task) {
   queue_remove((queue_t**)task->queue, (queue_t*)task);
   queue_append((queue_t**)&taskQueue, (queue_t*)task);
-  task->queue = &taskQueue;
   task->state = 'r';
+  task->queue = &taskQueue;
+}
+
+int task_join (task_t *task) {
+  if(task == NULL){
+    return -1;
+  }else if(task->state =='f'){
+    return task->exitCode;
+  }else{
+    task_suspend(execTask, &task->susQueue);
+    task_switch(&dispatcher);
+    return task->exitCode;
+  }
 }
 
 void task_yield () {
-  if(execTask->tid != 0){
-    queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
-    execTask->queue = &taskQueue;
+  
+  queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
+  execTask->queue = &taskQueue;
+  execTask->state = 'r';
 
-    userTasks++;
-  }
+  userTasks++;
+  dispatcher.activations++;
   task_switch(&dispatcher);
 }
 
 task_t *scheduler(){
+  /* 
   task_t *aux, *next;
   int prioMin = MAXPRIO + 1;
   
@@ -206,23 +240,31 @@ task_t *scheduler(){
 
   task_t* prox=(task_t*) queue_remove((queue_t**)next->queue, (queue_t*)next);
 
+  
   return prox;
-
+  */
+  
+  //userTasks--;
+  //printf("%ld\n", userTasks);
+  return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);
+  
 }
 
-void dispatcher_body () // dispatcher é uma tarefa
-{
+void dispatcher_body () {
    task_t *next;
    int i=0;
-   while ( userTasks > 0 ){
+   while (userTasks > 0){
       next = scheduler();
+      userTasks = queue_size((queue_t*)taskQueue);
       next->queue = NULL;
       next->quantum = TICKS;
+      next->activations++;
       if (next){
-         task_switch (next) ; // transfere controle para a tarefa "next"
+         task_switch (next) ;
       }
    }
-   task_exit(0) ; // encerra a tarefa dispatcher
+   //printf("aaa\n");
+   task_exit(0) ;
 }
 
 void task_setprio (task_t *task, int prio){
@@ -245,7 +287,6 @@ int task_getprio (task_t *task) {
 
 void tick_count(){
   ticks++;
-
   if(task_id() != idDispacher){
     execTask->quantum--;
     execTask->processorTime++;

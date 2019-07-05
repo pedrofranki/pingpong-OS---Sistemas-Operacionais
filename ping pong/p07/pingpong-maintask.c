@@ -39,6 +39,8 @@ int main (int argc, char *argv[])
    for (i=0; i<20000; i++)
       for (j=0; j<40000; j++) ;
 
+  // for(i=0;i<100;i++)
+    //  printf("%d", i);
    printf ("Main FIM    em %4d ms\n", systime()) ;
    task_exit (0);
 
