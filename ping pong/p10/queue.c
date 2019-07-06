@@ -70,7 +70,7 @@ queue_t *queue_remove (queue_t **queue, queue_t *elem) {
         printf("O elemento nao existae\n");
         return NULL;
     }
-    aux = (*queue);
+     aux = (*queue);
     do
     {
         if(aux == elem)

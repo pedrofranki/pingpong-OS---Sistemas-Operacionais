@@ -170,15 +170,14 @@ void task_suspend (task_t *task, task_t **queue) {
 }
 
 void task_resume (task_t *task) {
-  
 
- 
   if(task->queue!=NULL){
 
     queue_remove((queue_t**)(task->queue), (queue_t*)task);
   }
     
   queue_append((queue_t**)&taskQueue, (queue_t*)task);
+  userTasks++;
   task->state = 'r';
   task->queue = &taskQueue;
 
@@ -194,6 +193,64 @@ int task_join (task_t *task) {
     task_switch(&dispatcher);
     return task->exitCode;
   }
+}
+
+int sem_create (semaphore_t *s, int value) {
+  if(s == NULL){
+    return -1;
+  }
+  
+  s->queue = NULL;
+  s->value = value;
+  s->status = 1;
+
+  return 0;
+
+}
+
+// requisita o semáforo
+int sem_down (semaphore_t *s) {
+  if(s == NULL || s->status==0){
+    return -1;
+  }
+
+  s->value--;
+  if(s->value<0){
+    task_suspend(execTask, &(s->queue));
+    task_switch(&dispatcher);
+  }
+  return 0;
+}
+
+// libera o semáforo
+int sem_up (semaphore_t *s) {
+  if(s == NULL || s->status==0){
+    return -1;
+  }
+
+  s->value++;
+  if(s->value<0){
+    task_resume(s->queue);
+  }
+
+  return 0;
+
+}
+
+// destroi o semáforo, liberando as tarefas bloqueadas
+int sem_destroy (semaphore_t *s) {
+  if(s == NULL || s->status==0){
+    return -1;
+  }
+
+  if(s->status !=0){
+    s->status = 0;
+    while(s->queue != NULL){
+      task_resume(s->queue);
+    } 
+  }
+  return 0;
+  
 }
 
 void task_yield () {
@@ -250,7 +307,7 @@ task_t *scheduler(){
   return prox;
   */
   
-  //userTasks--;
+  userTasks--;
   //printf("%ld\n", userTasks);
   return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);
   
@@ -334,5 +391,4 @@ void task_sleep (int t) {
 
   task_switch(&dispatcher);
 }
-
 
