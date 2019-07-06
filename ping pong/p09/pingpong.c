@@ -19,7 +19,7 @@
 void dispatcher_body ();
 task_t *scheduler();
 void tick_count();
-int i=0;
+//int i=0;
 long int id = 0, userTasks=0;
 task_t mainTask, *execTask, *ant, *taskQueue, *suspendQueue, *sleepQueue;
 task_t dispatcher;
@@ -31,11 +31,9 @@ struct itimerval timer;
 void pingpong_init (){
     setvbuf (stdout, 0, _IONBF, 0) ;
 
-
     mainTask.tid = id++;
 
     execTask = &mainTask;
-    //printf("%d\n", execTask->tid);
     idDispacher = task_create(&dispatcher, dispatcher_body, NULL);
 
     action.sa_handler = tick_count ;
@@ -45,6 +43,8 @@ void pingpong_init (){
     {
       perror ("Erro em sigaction: ") ;
       exit (1) ;
+    }else{
+      printf("deu boa\n");
     }
 
     timer.it_value.tv_usec = TIMEMICRO;      // primeiro disparo, em micro-segundos
@@ -56,6 +56,8 @@ void pingpong_init (){
     {
       perror ("Erro em setitimer: ") ;
       exit (1) ;
+    }else{
+      printf("deu boaaa\n");
     }
 
     task_yield();
@@ -113,6 +115,7 @@ void task_exit (int exitCode){
         printf("task_exit: encerrando task %d.\n", taskExec->tid);
     #endif
     if(queue_size((queue_t*)execTask->susQueue)>0){
+        //printf("aaaaaaaa\n");
         task_resume(execTask->susQueue);
     }
     execTask->state = 'f';
@@ -154,18 +157,20 @@ int task_id (){
 void task_suspend (task_t *task, task_t **queue) {
   if(queue != NULL){
     if(task == NULL ){
+      printf("da\n");
       execTask->queue= queue;
       execTask->state = 's';
       queue_append((queue_t**)queue, (queue_t*)execTask);
       
     }else{
-      
-      //if(task->queue == NULL)
-        queue_remove((queue_t**)&taskQueue, (queue_t*)task);
-      queue_append((queue_t**)queue, (queue_t*)task);
       execTask->state = 's';
-
+      printf("ddw\n");
       task->queue = queue;
+      if(task->queue != NULL)
+        queue_remove((queue_t**)(task->queue), (queue_t*)task);
+      //printf("dwddw\n");
+      queue_append((queue_t**)queue, (queue_t*)task);
+
     }
   }
 }
@@ -173,7 +178,21 @@ void task_suspend (task_t *task, task_t **queue) {
 void task_resume (task_t *task) {
   task->state = 'r';
   task->queue = &taskQueue;
-  queue_remove((queue_t**)task->queue, (queue_t*)task);
+
+  //task_t **aux = task->queue;
+  /* 
+  printf("-ta-%d", queue_size((queue_t*)(*aux)));
+  do{
+    
+    printf("---%d ", (*aux)->tid);
+    (*aux) = (*aux)->next;
+  }while(aux!=task->queue);
+  printf("\n");*/
+  if(task->queue!=NULL){
+    //printf("%d\n", task->tid);
+    queue_remove((queue_t**)(task->queue), (queue_t*)task);
+  }
+    
   queue_append((queue_t**)&taskQueue, (queue_t*)task);
 
 }
@@ -184,6 +203,7 @@ int task_join (task_t *task) {
   }else if(task->state =='f'){
     return task->exitCode;
   }else{
+    //printf("aaa\n");
     task_suspend(execTask, &task->susQueue);
     task_switch(&dispatcher);
     return task->exitCode;
@@ -252,17 +272,37 @@ task_t *scheduler(){
 
 void dispatcher_body () {
    task_t *next;
-   int i=0;
-   while (userTasks > 0){
-      
-      next = scheduler();
-      userTasks = queue_size((queue_t*)taskQueue);
-      next->queue = NULL;
-      next->quantum = TICKS;
-      next->activations++;
-      if (next){
-         task_switch (next) ;
+  // int i=0;
+   while (userTasks > 0 || sleepQueue!=NULL){
+      if(taskQueue != NULL){
+        next = scheduler();
+        userTasks = queue_size((queue_t*)taskQueue);
+        next->queue = NULL;
+        next->quantum = TICKS;
+        next->activations++;
+        if (next){
+          task_switch (next) ;
+        }
       }
+      if(sleepQueue!=NULL){
+        task_t *aux = sleepQueue, *rem;
+        
+        do{
+          rem = aux;
+          
+          if(rem->sleepTime<=systime()){
+            //printf("%d\n", aux->tid);
+            aux=aux->next;
+            queue_append((queue_t**)&taskQueue,queue_remove((queue_t**)&sleepQueue,(queue_t*)rem));
+            userTasks++;
+
+          }else{
+            aux = aux->next;
+          }
+          //printf("a");
+        }while(aux!=sleepQueue && sleepQueue != NULL);
+      }     
+     
    }
    //printf("aaa\n");
    task_exit(0) ;
@@ -287,9 +327,8 @@ int task_getprio (task_t *task) {
 }
 
 void tick_count(){
-  
   ticks++;
-  //printf("%d\n", ticks);
+  //printf("aaa\n");
   if(task_id() != idDispacher){
     execTask->quantum--;
     execTask->processorTime++;
@@ -300,6 +339,24 @@ void tick_count(){
 }
 
 unsigned int systime (){
+  //printf("%d\n", ticks);
   return ticks;
 }
 
+void task_sleep (int t) {
+  execTask->sleepTime = systime() + t*1000;
+
+  queue_append((queue_t**)&sleepQueue, (queue_t*)execTask);
+  execTask->queue = &sleepQueue;
+  //printf("%d ", execTask->tid);
+/* 
+  task_t* aux = taskQueue;
+  do{
+    printf("%d ", aux=->tid);
+    aux= aux->next;
+  }while(aux!=taskQueue);
+
+  printf("\n");
+   */
+  task_switch(&dispatcher);
+}

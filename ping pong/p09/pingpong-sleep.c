@@ -16,7 +16,7 @@ void Body (void * arg)
 
    for (i=0; i<10; i++)
    {
-      sleepTime = random() % 5 ;
+      sleepTime = random() %  5;
       printf ("%5d ms: %s %d (dorme %ds)\n",
               systime(), (char *) arg, i, sleepTime) ;
       task_sleep (sleepTime) ;

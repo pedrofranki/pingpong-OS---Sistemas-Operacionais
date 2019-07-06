@@ -63,7 +63,7 @@ int task_join (task_t *task) ;
 // operações de gestão do tempo ================================================
 
 // suspende a tarefa corrente por t segundos
-void task_sleep (int t);
+void task_sleep (int t) ;
 
 // retorna o relógio atual (em milisegundos)
 unsigned int systime () ;

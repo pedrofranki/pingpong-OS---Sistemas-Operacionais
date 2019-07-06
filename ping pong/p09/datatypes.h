@@ -22,7 +22,7 @@ typedef struct task_t{
   unsigned int exitTime;
   unsigned int processorTime;
   unsigned int executionTime;
-  
+  unsigned int sleepTime;
   int activations;
 } task_t ;
 
