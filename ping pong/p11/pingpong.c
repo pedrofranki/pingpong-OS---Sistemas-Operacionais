@@ -400,3 +400,58 @@ void task_sleep (int t) {
   task_switch(&dispatcher);
 }
 
+int barrier_create (barrier_t *b, int N) {
+  if(!b || N < 0){
+    return -1;
+  }
+
+  preempcao = 0;
+  
+  b->max = N;
+  b->n = 0;
+  b->bQueue = NULL;
+  b->status = 1;
+
+  preempcao = 0;
+
+  return 0;
+
+}
+
+// Chega a uma barreira
+int barrier_join (barrier_t *b) {
+  if(!b || !(b->status)){
+    return -1;
+  }
+
+  preempcao = 0;
+  b->n = b->n + 1;
+  if(b->n == b->max){
+    while(b->bQueue != NULL){
+      task_resume(b->bQueue);
+    }
+    b->n = 0;
+    preempcao = 1;
+  }else{
+    preempcao = 1;
+    task_suspend(NULL, &(b->bQueue));
+  }
+  return 0;
+}
+
+// Destrói uma barreira
+int barrier_destroy (barrier_t *b) {
+  if(!b || !(b->status)){
+    return -1;
+  }
+
+  preempcao = 0;
+  b->status = 0;
+  while(b->bQueue != NULL){
+    task_resume(b->bQueue);
+  }
+  preempcao = 1;
+
+  return 0;
+
+}
