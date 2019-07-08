@@ -6,7 +6,9 @@
 #include "pingpong.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ucontext.h>
+#include <sys/time.h>
 #define STACKSIZE 32768		/* tamanho de pilha das threads */
 #define _XOPEN_SOURCE 600	/* para compilar no MacOS */
 #define MINPRIO -20
@@ -23,7 +25,7 @@ void tick_count();
 long int id = 0, userTasks=0;
 task_t mainTask, *execTask, *ant, *taskQueue, *suspendQueue, *sleepQueue;
 task_t dispatcher;
-int ticks = 0, preempcao = 1, sId=0;
+int ticks = 0, preempcao = 1, sId =0;
 int idDispacher;
 struct sigaction action;
 struct itimerval timer;
@@ -55,7 +57,7 @@ void pingpong_init (){
       perror ("Erro em setitimer: ") ;
       exit (1) ;
     }
-    //printf("aaaa\n");
+    printf("aaaa\n");
     task_yield();
 }
 
@@ -93,9 +95,6 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     //task->tid = id++;
     task->creationTime = systime();
     task->activations=0;
-#ifdef DEBUG
-    printf("task_create: task %d criada.\n", task->tid);
-#endif
 
     return task->tid;
 }
@@ -116,8 +115,6 @@ void task_exit (int exitCode){
     }
     execTask->state = 'f';
     execTask->exitCode = exitCode;
-
- 
 
     if(execTask == &dispatcher){
       task_switch(&mainTask);
@@ -153,31 +150,30 @@ int task_id (){
 void task_suspend (task_t *task, task_t **queue) {
   if(queue != NULL){
     if(task == NULL ){
-      //printf("s1\n");
+      //printf("tt\n");
       queue_append((queue_t**)queue, (queue_t*)execTask);
       execTask->queue= queue;
-      //execTask->state = 's';
+      execTask->state = 's';
       task_switch(&dispatcher);
     }else{   
       if(task->queue != NULL)
         queue_remove((queue_t**)(task->queue), (queue_t*)task);
-      //printf("s2\n");
+      //printf("yy\n");
       queue_append((queue_t**)queue, (queue_t*)task);
-      
+      execTask->state = 's';
       task->queue = queue;
 
     }
   }
-  execTask->state = 's';
 }
 
 void task_resume (task_t *task) {
 
   if(task->queue!=NULL){
-    ///printf("resmma\n");
+
     queue_remove((queue_t**)(task->queue), (queue_t*)task);
   }
-  //printf("%d\n", task->tid);
+    
   queue_append((queue_t**)&taskQueue, (queue_t*)task);
   userTasks++;
   task->state = 'r';
@@ -191,7 +187,7 @@ int task_join (task_t *task) {
   }else if(task->state =='f'){
     return task->exitCode;
   }else{
-    task_suspend(NULL, &task->susQueue);
+    task_suspend(execTask, &task->susQueue);
     task_switch(&dispatcher);
     return task->exitCode;
   }
@@ -220,16 +216,17 @@ int sem_down (semaphore_t *s) {
     preempcao = 1;
     return -1;
   }
-  
-  s->value--;
+  //printf("sem_down %d\n", s->id);
+  (s->value)--;
   if(s->value<0){
     preempcao = 1;
+    //printf("down<0\n");
 
     task_suspend(execTask, &(s->queue));
     task_switch(&dispatcher);
     //task_yield();
   }
-  preempcao = 1;
+  
   return 0;
 }
 
@@ -241,7 +238,10 @@ int sem_up (semaphore_t *s) {
     return -1;
   }
   s->value++;
+  //printf("up %d\n", s->id);
   if(s->value<=0){
+    //printf("up<0\n");
+    preempcao = 1;
     task_resume(s->queue);
   }
   preempcao = 1;
@@ -260,7 +260,6 @@ int sem_destroy (semaphore_t *s) {
   if(s->status !=0){
     s->status = 0;
     while(s->queue != NULL){
-      preempcao = 1;
       task_resume(s->queue);
     } 
   }
@@ -270,14 +269,12 @@ int sem_destroy (semaphore_t *s) {
 }
 
 void task_yield () {
-  if(execTask->state != 's'){ 
-    queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
-    userTasks++;
-    execTask->queue = &taskQueue;
-    execTask->state = 'r';
-  }
-
   
+  queue_append((queue_t**)&taskQueue, (queue_t*)execTask);
+  execTask->queue = &taskQueue;
+  execTask->state = 'r';
+
+  userTasks++;
   dispatcher.activations++;
   task_switch(&dispatcher);
 }
@@ -334,7 +331,6 @@ task_t *scheduler(){
 void dispatcher_body () {
    task_t *next;
    while (userTasks > 0 || sleepQueue!=NULL){
-     
       if(taskQueue != NULL){
         next = scheduler();
         userTasks = queue_size((queue_t*)taskQueue);
@@ -342,21 +338,19 @@ void dispatcher_body () {
         next->quantum = TICKS;
         next->activations++;
         if (next){
+          //printf("ggg\n");
           task_switch (next) ;
         }
       }
-      if(sleepQueue != NULL){
+      if(sleepQueue!=NULL){
         task_t *aux = sleepQueue, *rem;
         
         do{
           rem = aux;
           
-          if(rem->sleepTime <= systime()){
-            
+          if(rem->sleepTime<=systime()){
             aux=aux->next;
-           // printf("sl\n");
             queue_append((queue_t**)&taskQueue,queue_remove((queue_t**)&sleepQueue,(queue_t*)rem));
-            //task_resume(rem);
             userTasks++;
 
           }else{
@@ -406,9 +400,187 @@ unsigned int systime (){
 
 void task_sleep (int t) {
   execTask->sleepTime = systime() + t*1000;
+
   queue_append((queue_t**)&sleepQueue, (queue_t*)execTask);
   execTask->queue = &sleepQueue;
 
   task_switch(&dispatcher);
 }
 
+int barrier_create (barrier_t *b, int N) {
+  if(!b || N < 0){
+    return -1;
+  }
+
+  preempcao = 0;
+  
+  b->max = N;
+  b->n = 0;
+  b->bQueue = NULL;
+  b->status = 1;
+
+  preempcao = 0;
+
+  return 0;
+
+}
+
+// Chega a uma barreira
+int barrier_join (barrier_t *b) {
+  if(!b || !(b->status)){
+    return -1;
+  }
+
+  preempcao = 0;
+  b->n = b->n + 1;
+  if(b->n == b->max){
+    while(b->bQueue != NULL){
+      task_resume(b->bQueue);
+    }
+    b->n = 0;
+    preempcao = 1;
+  }else{
+    preempcao = 1;
+    task_suspend(NULL, &(b->bQueue));
+  }
+  return 0;
+}
+
+// Destrói uma barreira
+int barrier_destroy (barrier_t *b) {
+  if(!b || !(b->status)){
+    return -1;
+  }
+
+  preempcao = 0;
+  b->status = 0;
+  while(b->bQueue != NULL){
+    task_resume(b->bQueue);
+  }
+  preempcao = 1;
+
+  return 0;
+
+}
+
+
+int mqueue_create (mqueue_t *queue, int max, int size) {
+  if(!(queue)){
+    return -1;
+  }
+
+  preempcao = 0;
+  queue->maxMsg = max;
+  queue->sizeMsg = size;
+  queue->countMsg = 0;
+  queue->index = 0;
+  queue->status = 1;
+  queue->msgQueue = malloc(size * max +1);
+
+  sem_create(&queue->s_item,0);
+  sem_create(&queue->s_fila,1);
+  sem_create(&queue->s_vaga,max);
+
+  preempcao = 1;
+  return 0;
+}
+
+// envia uma mensagem para a fila
+int mqueue_send (mqueue_t *queue, void *msg) {
+  if(!(queue)){
+    return -1;
+  }
+  //printf("m send\n");
+  /* 
+  if(sem_down(&queue->s_vaga)<0){
+    return -1;
+  }
+
+  if(sem_down(&queue->s_fila)<0){
+    return -1;
+  }*/
+  sem_down(&queue->s_vaga);
+  sem_down(&queue->s_fila);
+  
+
+  
+
+  memcpy(queue->msgQueue + queue->index * queue->sizeMsg ,msg ,queue->sizeMsg );
+  ++(queue->countMsg);
+  queue->index = (queue->index + 1)%queue->maxMsg;
+
+  sem_up(&(queue->s_fila));
+  //printf("aa\n");
+  sem_up(&(queue->s_item));
+  //printf("\taa\n");
+  return 0;
+  
+}
+
+// recebe uma mensagem da fila
+int mqueue_recv (mqueue_t *queue, void *msg) {
+  //void* send;
+  //void* rec;
+  if(!(queue)){
+    return -1;
+  }
+  
+  sem_down(&queue->s_item);
+  
+  sem_down(&queue->s_fila);
+/* for(int i = 1; i < (queue->nmsg); i++)
+      memcpy(queue->msg+(i-1)*queue->size, queue->msg + i*queue->size, queue->size);
+    (queue->nmsg)--;*/
+  
+  //queue->countMsg = (queue->countMsg) - 1;
+  --(queue->countMsg);
+  memcpy(msg, queue->msgQueue ,queue->sizeMsg );
+
+  /* send = queue->msgQueue + queue->sizeMsg;
+  rec = queue->sizeMsg;*/
+  //printf("aa\n");
+  //for(int i=1;i<(queue->countMsg); i++){
+  //  memcpy(queue->sizeMsg+(i-1)*queue->sizeMsg, queue->msgQueue + i*queue->sizeMsg, queue->sizeMsg);
+    //send += queue->sizeMsg;
+    //rec += queue->sizeMsg;
+
+  //}
+    void *send = queue->msgQueue + queue->sizeMsg;
+    void *rec = queue->msgQueue;
+    for (int i = 0; i < queue->countMsg; i++) {
+        memcpy(rec, send, queue->sizeMsg);
+        send += queue->sizeMsg;
+        rec += queue->sizeMsg;
+    }
+  //queue->index = (queue->index + 1)%queue->maxMsg;
+
+  sem_up(&(queue->s_fila));
+  sem_up(&(queue->s_vaga));
+
+  return 0;
+}
+
+// destroi a fila, liberando as tarefas bloqueadas
+int mqueue_destroy (mqueue_t *queue) {
+  if(!(queue)){
+    return -1;
+  }
+
+  free(queue->msgQueue);
+  sem_destroy(&(queue->s_item));
+  sem_destroy(&(queue->s_fila));
+  sem_destroy(&(queue->s_vaga));
+
+  queue->status=0;
+
+  return 0;
+}
+
+// informa o número de mensagens atualmente na fila
+int mqueue_msgs (mqueue_t *queue) {
+  if(!(queue)||queue->status==0){
+    return 0;
+  }
+
+  return queue->countMsg;
+}

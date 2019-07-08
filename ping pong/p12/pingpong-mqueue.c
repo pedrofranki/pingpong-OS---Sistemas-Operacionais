@@ -108,7 +108,7 @@ int main (int argc, char *argv[])
    task_create (&prod[0], prodBody, NULL) ;
    task_create (&prod[1], prodBody, NULL) ;
    task_create (&prod[2], prodBody, NULL) ;
-
+   
    // aguarda o somador encerrar
    task_join (&somador) ;
 
