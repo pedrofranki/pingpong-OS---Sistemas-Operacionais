@@ -21,9 +21,9 @@
 void dispatcher_body ();
 task_t *scheduler();
 void tick_count();
-//int i=0;
+
 long int id = 0, userTasks=0;
-task_t mainTask, *execTask, *ant, *taskQueue, *suspendQueue, *sleepQueue;
+task_t mainTask, *execTask, *ant, *taskQueue, *sleepQueue;
 task_t dispatcher;
 int ticks = 0, preempcao = 1, sId =0;
 int idDispacher;
@@ -64,7 +64,6 @@ void pingpong_init (){
 
 int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     char* stack;
-    //task->tid = id++;
 
     getcontext(&(task->context));
 
@@ -85,14 +84,12 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
 
     task->tid = id;
     id++;
-    //printf("%d", task->tid);
     if(task->tid >1){
       queue_append((queue_t**)&taskQueue, (queue_t*)task);
       userTasks++;
       task->queue = &taskQueue;
     }
 
-    //task->tid = id++;
     task->creationTime = systime();
     task->activations=0;
 
@@ -109,9 +106,8 @@ void task_exit (int exitCode){
     #ifdef DEBUG
         printf("task_exit: encerrando task %d.\n", taskExec->tid);
     #endif
-    if(queue_size((queue_t*)execTask->susQueue)>0){
-        //printf("aaaaaaaa\n");
-        task_resume(execTask->susQueue);
+    while(execTask->susQueue != NULL){
+      task_resume(execTask->susQueue);
     }
     execTask->state = 'f';
     execTask->exitCode = exitCode;
@@ -150,7 +146,7 @@ int task_id (){
 void task_suspend (task_t *task, task_t **queue) {
   if(queue != NULL){
     if(task == NULL ){
-      //printf("tt\n");
+     
       queue_append((queue_t**)queue, (queue_t*)execTask);
       execTask->queue= queue;
       execTask->state = 's';
@@ -158,7 +154,7 @@ void task_suspend (task_t *task, task_t **queue) {
     }else{   
       if(task->queue != NULL)
         queue_remove((queue_t**)(task->queue), (queue_t*)task);
-      //printf("yy\n");
+      
       queue_append((queue_t**)queue, (queue_t*)task);
       execTask->state = 's';
       task->queue = queue;
@@ -216,15 +212,13 @@ int sem_down (semaphore_t *s) {
     preempcao = 1;
     return -1;
   }
-  //printf("sem_down %d\n", s->id);
+  
   (s->value)--;
   if(s->value<0){
     preempcao = 1;
-    //printf("down<0\n");
-
     task_suspend(execTask, &(s->queue));
     task_switch(&dispatcher);
-    //task_yield();
+    
   }
   
   return 0;
@@ -238,9 +232,8 @@ int sem_up (semaphore_t *s) {
     return -1;
   }
   s->value++;
-  //printf("up %d\n", s->id);
+  
   if(s->value<=0){
-    //printf("up<0\n");
     preempcao = 1;
     task_resume(s->queue);
   }
@@ -322,8 +315,7 @@ task_t *scheduler(){
   return prox;
   */
   
-  userTasks--;
-  //printf("%ld\n", userTasks);
+ // userTasks--;
   return (task_t*) queue_remove((queue_t**)&taskQueue, (queue_t*)taskQueue);
   
 }
@@ -338,7 +330,7 @@ void dispatcher_body () {
         next->quantum = TICKS;
         next->activations++;
         if (next){
-          //printf("ggg\n");
+    
           task_switch (next) ;
         }
       }
@@ -490,37 +482,28 @@ int mqueue_send (mqueue_t *queue, void *msg) {
   if(!(queue)){
     return -1;
   }
-  //printf("m send\n");
-  /* 
-  if(sem_down(&queue->s_vaga)<0){
-    return -1;
-  }
+  
 
-  if(sem_down(&queue->s_fila)<0){
-    return -1;
-  }*/
   sem_down(&queue->s_vaga);
   sem_down(&queue->s_fila);
   
 
   
 
-  memcpy(queue->msgQueue + queue->index * queue->sizeMsg ,msg ,queue->sizeMsg );
+  memcpy(queue->msgQueue + queue->countMsg*queue->sizeMsg ,msg ,queue->sizeMsg );
   ++(queue->countMsg);
-  queue->index = (queue->index + 1)%queue->maxMsg;
-
+ 
   sem_up(&(queue->s_fila));
-  //printf("aa\n");
+ 
   sem_up(&(queue->s_item));
-  //printf("\taa\n");
+ ;
   return 0;
   
 }
 
 // recebe uma mensagem da fila
 int mqueue_recv (mqueue_t *queue, void *msg) {
-  //void* send;
-  //void* rec;
+  
   if(!(queue)){
     return -1;
   }
@@ -528,31 +511,18 @@ int mqueue_recv (mqueue_t *queue, void *msg) {
   sem_down(&queue->s_item);
   
   sem_down(&queue->s_fila);
-/* for(int i = 1; i < (queue->nmsg); i++)
-      memcpy(queue->msg+(i-1)*queue->size, queue->msg + i*queue->size, queue->size);
-    (queue->nmsg)--;*/
-  
-  //queue->countMsg = (queue->countMsg) - 1;
-  --(queue->countMsg);
+  (queue->countMsg)--;
+
   memcpy(msg, queue->msgQueue ,queue->sizeMsg );
-
-  /* send = queue->msgQueue + queue->sizeMsg;
-  rec = queue->sizeMsg;*/
-  //printf("aa\n");
-  //for(int i=1;i<(queue->countMsg); i++){
-  //  memcpy(queue->sizeMsg+(i-1)*queue->sizeMsg, queue->msgQueue + i*queue->sizeMsg, queue->sizeMsg);
-    //send += queue->sizeMsg;
-    //rec += queue->sizeMsg;
-
-  //}
-    void *send = queue->msgQueue + queue->sizeMsg;
-    void *rec = queue->msgQueue;
-    for (int i = 0; i < queue->countMsg; i++) {
-        memcpy(rec, send, queue->sizeMsg);
-        send += queue->sizeMsg;
-        rec += queue->sizeMsg;
-    }
-  //queue->index = (queue->index + 1)%queue->maxMsg;
+ 
+  void *send = queue->msgQueue + queue->sizeMsg;
+  void *rec = queue->msgQueue;
+  for (int i = 0; i < queue->countMsg; i++) {
+    memcpy(rec, send, queue->sizeMsg);
+    send += queue->sizeMsg;
+    rec += queue->sizeMsg;
+  }
+  
 
   sem_up(&(queue->s_fila));
   sem_up(&(queue->s_vaga));
@@ -564,16 +534,18 @@ int mqueue_recv (mqueue_t *queue, void *msg) {
 int mqueue_destroy (mqueue_t *queue) {
   if(!(queue)){
     return -1;
+  }else{
+    free(queue->msgQueue);
+    sem_destroy(&(queue->s_item));
+    sem_destroy(&(queue->s_fila));
+    sem_destroy(&(queue->s_vaga));
+
+    queue->status=0;
+
+    return 0;
   }
 
-  free(queue->msgQueue);
-  sem_destroy(&(queue->s_item));
-  sem_destroy(&(queue->s_fila));
-  sem_destroy(&(queue->s_vaga));
-
-  queue->status=0;
-
-  return 0;
+  
 }
 
 // informa o número de mensagens atualmente na fila

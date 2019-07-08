@@ -10,11 +10,11 @@ CPING = pingpong.c
 all: $(TARGET)
 	@echo "Concluido"
 
-$(TARGET): contab pingpong queue
-	$(CC) $(FLAGS) -o $(TARGET) contab pingpong queue
+$(TARGET): join pingpong queue
+	$(CC) $(FLAGS) -o $(TARGET) join pingpong queue -lm
 
-contab: pingpong-join.c
-	$(CC) -c pingpong-join.c -o contab
+join: pingpong-join.c
+	$(CC) -c pingpong-join.c -o join
 
 pingpong: pingpong.c
 	$(CC) -c pingpong.c -o pingpong

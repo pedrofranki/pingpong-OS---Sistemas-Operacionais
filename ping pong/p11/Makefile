@@ -1,29 +1,27 @@
 TARGET = pingpong-barrier
-LIBS = 
+LIBS =
 CC = gcc
-CFLAGS = -Wall
+FLAGS = -Wall
+CQUEUE = 	queue.c
+QUEUE = queue
+CPING = pingpong.c
 
-.PHONY: default all clean
 
-default: $(TARGET)
-all: default
-debug: default
+all: $(TARGET)
+	@echo "Concluido"
 
-OBJECTS = queue.o pingpong.o
-OBJECT = pingpong-barrier.o
-HEADERS = $(wildcard *.h)
+$(TARGET): barrier.o pingpong.o queue.o
+	$(CC) $(FLAGS) -o $(TARGET) barrier.o pingpong.o queue.o -lm
 
-debug: DEBUG = -DDEBUG
+barrier.o: pingpong-barrier.c
+	$(CC) -c pingpong-barrier.c -o barrier.o
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(DEBUG) -c $< -o $@
+pingpong.o: pingpong.c
+	$(CC) -c pingpong.c -o pingpong.o
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
-
-$(TARGET): $(OBJECTS) $(OBJECT)
-	$(CC) $(OBJECTS) $(OBJECT) $(CFLAGS) $(LIBS) -o $@
+queue.o: queue.c
+	$(CC) -c queue.c -o queue.o
 
 clean:
 	-rm -f *.o
 	-rm -f $(TARGET)
-

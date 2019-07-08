@@ -1,39 +1,41 @@
-TARGET0 = pingpong-racecond
-TARGET1 = pingpong-semaphore
-TARGET2 = pingpong-prodcons
-LIBS = 
+TARGET1 = pingpong-prodcons
+TARGET2 = pingpong-racecond
+TARGET3 = pingpong-semaphore
+LIBS =
 CC = gcc
-CFLAGS = -Wall
+FLAGS = -Wall
+CQUEUE = 	queue.c
+QUEUE = queue
+CPING = pingpong.c
 
-.PHONY: default all clean
 
-default: $(TARGET0) $(TARGET1) $(TARGET2)
-all: default
-debug: default
+all: $(TARGET)
+	@echo "Concluido"
 
-OBJECTS = queue.o pingpong.o
-OBJECT0 = pingpong-racecond.o
-OBJECT1 = pingpong-semaphore.o
-OBJECT2 = pingpong-prodcons.o
-HEADERS = $(wildcard *.h)
+$(TARGET1): prodcons.o pingpong.o queue.o
+	$(CC) $(FLAGS) -o $(TARGET) prodcons.o pingpong.o queue.o -lm
 
-debug: DEBUG = -DDEBUG
+$(TARGET2): racecond.o pingpong.o queue.o
+	$(CC) $(FLAGS) -o $(TARGET) racecondsleep.o pingpong.o queue.o -lm
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(DEBUG) -c $< -o $@
+$(TARGET3): semaphore.o pingpong.o queue.o
+	$(CC) $(FLAGS) -o $(TARGET) semaphore.o pingpong.o queue.o -lm
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
+semaphore.o: pingpong-semaphore.c
+	$(CC) -c pingpong-semaphore.c -o semaphore.o
 
-$(TARGET0): $(OBJECTS) $(OBJECT0)
-	$(CC) $(OBJECTS) $(OBJECT0) $(CFLAGS) $(LIBS) -o $@
+racecond.o: pingpong-racecond.c
+	$(CC) -c pingpong-racecond.c -o racecond.o
 
-$(TARGET1): $(OBJECTS) $(OBJECT1)
-	$(CC) $(OBJECTS) $(OBJECT1) $(CFLAGS) $(LIBS) -o $@
+prodcons.o: pingpong-prodcons.c
+	$(CC) -c pingpong-prodcons.c -o prodcons.o
 
-$(TARGET2): $(OBJECTS) $(OBJECT2)
-	$(CC) $(OBJECTS) $(OBJECT2) $(CFLAGS) $(LIBS) -o $@
+pingpong.o: pingpong.c
+	$(CC) -c pingpong.c -o pingpong.o
+
+queue.o: queue.c
+	$(CC) -c queue.c -o queue.o
 
 clean:
 	-rm -f *.o
-	-rm -f $(TARGET0) $(TARGET1) $(TARGET2)
-
+	-rm -f $(TARGET)

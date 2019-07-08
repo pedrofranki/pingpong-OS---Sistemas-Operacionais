@@ -19,9 +19,8 @@
 void dispatcher_body ();
 task_t *scheduler();
 void tick_count();
-//int i=0;
 long int id = 0, userTasks=0;
-task_t mainTask, *execTask, *ant, *taskQueue, *suspendQueue, *sleepQueue;
+task_t mainTask, *execTask, *ant, *taskQueue, *sleepQueue;
 task_t dispatcher;
 int ticks = 0, preempcao = 1;
 int idDispacher;
@@ -55,14 +54,12 @@ void pingpong_init (){
       perror ("Erro em setitimer: ") ;
       exit (1) ;
     }
-    printf("aaaa\n");
     task_yield();
 }
 
 
 int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
     char* stack;
-    //task->tid = id++;
 
     getcontext(&(task->context));
 
@@ -83,14 +80,12 @@ int task_create (task_t *task,	void (*start_func)(void *),	 void *arg){
 
     task->tid = id;
     id++;
-    printf("%d", task->tid);
     if(task->tid >1){
       queue_append((queue_t**)&taskQueue, (queue_t*)task);
       userTasks++;
       task->queue = &taskQueue;
     }
 
-    //task->tid = id++;
     task->creationTime = systime();
     task->activations=0;
 #ifdef DEBUG
@@ -110,14 +105,11 @@ void task_exit (int exitCode){
     #ifdef DEBUG
         printf("task_exit: encerrando task %d.\n", taskExec->tid);
     #endif
-    if(queue_size((queue_t*)execTask->susQueue)>0){
-        //printf("aaaaaaaa\n");
-        task_resume(execTask->susQueue);
+    while(execTask->susQueue != NULL){
+      task_resume(execTask->susQueue);
     }
     execTask->state = 'f';
     execTask->exitCode = exitCode;
-
- 
 
     if(execTask == &dispatcher){
       task_switch(&mainTask);
@@ -387,7 +379,6 @@ void tick_count(){
 }
 
 unsigned int systime (){
-
   return ticks;
 }
 
@@ -448,6 +439,7 @@ int barrier_destroy (barrier_t *b) {
   preempcao = 0;
   b->status = 0;
   while(b->bQueue != NULL){
+    preempcao = 1;
     task_resume(b->bQueue);
   }
   preempcao = 1;

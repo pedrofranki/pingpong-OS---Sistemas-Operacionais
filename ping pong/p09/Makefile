@@ -1,29 +1,27 @@
 TARGET = pingpong-sleep
-LIBS = 
+LIBS =
 CC = gcc
-CFLAGS = -Wall
+FLAGS = -Wall
+CQUEUE = 	queue.c
+QUEUE = queue
+CPING = pingpong.c
 
-.PHONY: default all clean
 
-default: $(TARGET)
-all: default
-debug: default
+all: $(TARGET)
+	@echo "Concluido"
 
-OBJECTS = queue.o pingpong.o
-OBJECT = pingpong-sleep.o
-HEADERS = $(wildcard *.h)
+$(TARGET): sleep pingpong queue
+	$(CC) $(FLAGS) -o $(TARGET) sleep pingpong queue -lm
 
-debug: DEBUG = -DDEBUG
+sleep: pingpong-sleep.c
+	$(CC) -c pingpong-sleep.c -o sleep
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(DEBUG) -c $< -o $@
+pingpong: pingpong.c
+	$(CC) -c pingpong.c -o pingpong
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
-
-$(TARGET): $(OBJECTS) $(OBJECT)
-	$(CC) $(OBJECTS) $(OBJECT) $(CFLAGS) $(LIBS) -o $@
+queue: queue.c
+	$(CC) -c queue.c -o queue
 
 clean:
 	-rm -f *.o
 	-rm -f $(TARGET)
-

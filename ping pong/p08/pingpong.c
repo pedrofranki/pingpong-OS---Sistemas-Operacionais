@@ -112,8 +112,9 @@ void task_exit (int exitCode){
     #ifdef DEBUG
         printf("task_exit: encerrando task %d.\n", taskExec->tid);
     #endif
-    if(queue_size((queue_t*)execTask->susQueue)>0){
-        task_resume(execTask->susQueue);
+    
+    while(execTask->susQueue != NULL){
+      task_resume(execTask->susQueue);
     }
     execTask->state = 'f';
     execTask->exitCode = exitCode;
@@ -154,27 +155,34 @@ int task_id (){
 void task_suspend (task_t *task, task_t **queue) {
   if(queue != NULL){
     if(task == NULL ){
+     
+      queue_append((queue_t**)queue, (queue_t*)execTask);
       execTask->queue= queue;
       execTask->state = 's';
-      queue_append((queue_t**)queue, (queue_t*)execTask);
+      task_switch(&dispatcher);
+    }else{   
+      if(task->queue != NULL)
+        queue_remove((queue_t**)(task->queue), (queue_t*)task);
       
-    }else{
-      
-      //if(task->queue == NULL)
-        queue_remove((queue_t**)&taskQueue, (queue_t*)task);
       queue_append((queue_t**)queue, (queue_t*)task);
       execTask->state = 's';
-
       task->queue = queue;
+
     }
   }
 }
 
 void task_resume (task_t *task) {
+ 
+  if(task->queue!=NULL){
+
+    queue_remove((queue_t**)(task->queue), (queue_t*)task);
+  }
+    
+  queue_append((queue_t**)&taskQueue, (queue_t*)task);
+  userTasks++;
   task->state = 'r';
   task->queue = &taskQueue;
-  queue_remove((queue_t**)task->queue, (queue_t*)task);
-  queue_append((queue_t**)&taskQueue, (queue_t*)task);
 
 }
 
@@ -264,7 +272,6 @@ void dispatcher_body () {
          task_switch (next) ;
       }
    }
-   //printf("aaa\n");
    task_exit(0) ;
 }
 
